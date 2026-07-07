@@ -7,7 +7,8 @@ name = "app-adapter"
 version = "0.3.0"
 description = "Control any software via unified commands — the AI-to-App bridge. Give any AI agent the power to control real apps (Zoom, Slack, WeChat, Excel, etc.) through a simple command interface."
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "Jacky Xu", email = "codenoob-jacky@users.noreply.github.com"}
 ]
@@ -20,7 +21,7 @@ keywords = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
