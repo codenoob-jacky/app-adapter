@@ -1,3 +1,55 @@
+Metadata-Version: 2.4
+Name: app-adapter
+Version: 0.3.0
+Summary: Control any software via unified commands — the AI-to-App bridge. Give any AI agent the power to control real apps (Zoom, Slack, WeChat, Excel, etc.) through a simple command interface.
+Author-email: Jacky Xu <codenoob-jacky@users.noreply.github.com>
+License: MIT
+Project-URL: Homepage, https://github.com/codenoob-jacky/app-adapter
+Project-URL: Repository, https://github.com/codenoob-jacky/app-adapter
+Project-URL: Issues, https://github.com/codenoob-jacky/app-adapter/issues
+Project-URL: Registry, https://github.com/codenoob-jacky/app-adapter/tree/main/registry
+Keywords: ai,agent,mcp,automation,adapter,browser-automation,desktop-automation,app-control,claude,codex,cursor,llm-tools,model-context-protocol,playwright,uiautomation
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Internet :: WWW/HTTP :: Browsers
+Classifier: Environment :: Console
+Classifier: Framework :: AsyncIO
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pyautogui>=0.9.5
+Provides-Extra: cdp
+Requires-Dist: playwright>=1.40.0; extra == "cdp"
+Provides-Extra: uia
+Requires-Dist: uiautomation>=2.0.0; extra == "uia"
+Provides-Extra: office
+Requires-Dist: openpyxl>=3.0.0; extra == "office"
+Requires-Dist: python-docx>=0.8.0; extra == "office"
+Requires-Dist: python-pptx>=0.6.0; extra == "office"
+Requires-Dist: pdfplumber>=0.9.0; extra == "office"
+Requires-Dist: weasyprint>=60.0; extra == "office"
+Requires-Dist: markdown>=3.5.0; extra == "office"
+Provides-Extra: mcp
+Requires-Dist: mcp>=1.0.0; extra == "mcp"
+Provides-Extra: all
+Requires-Dist: playwright>=1.40.0; extra == "all"
+Requires-Dist: uiautomation>=2.0.0; extra == "all"
+Requires-Dist: openpyxl>=3.0.0; extra == "all"
+Requires-Dist: python-docx>=0.8.0; extra == "all"
+Requires-Dist: python-pptx>=0.6.0; extra == "all"
+Requires-Dist: pdfplumber>=0.9.0; extra == "all"
+Requires-Dist: weasyprint>=60.0; extra == "all"
+Requires-Dist: markdown>=3.5.0; extra == "all"
+Requires-Dist: mcp>=1.0.0; extra == "all"
+Dynamic: license-file
+
 # App Adapter — Control Any Software via Commands
 
 **The AI-to-App Bridge.** Give any AI agent the power to control real software —
@@ -48,46 +100,24 @@ No screen recording. No pixel matching. Just `app_do("app.action", params)`.
 ## Quick Start
 
 ```bash
-# One-line install (recommended)
-pip install git+https://github.com/codenoob-jacky/app-adapter.git
-
-# Or clone + dev install
+# 1. Install
 git clone https://github.com/codenoob-jacky/app-adapter.git
 cd app-adapter
-pip install -e .
+pip install -r requirements.txt
 
-# With all optional deps (browser + desktop automation):
-pip install "app-adapter[all] @ git+https://github.com/codenoob-jacky/app-adapter.git"
+# Windows one-click: scripts\install.bat
+# Mac/Linux one-click: bash scripts/install.sh
 
-# Windows: scripts\install.bat   |   Mac/Linux: bash scripts/install.sh
-```
+# 2. Start the MCP server
+python server.py --port 8080
 
-### CLI (install once, use everywhere)
+# 3. Any agent can now control your apps
+curl -X POST http://localhost:8080 \
+  -H "Content-Type: application/json" \
+  -d '{"tool":"app_list"}'
 
-```bash
-app-adapter                          # Quick overview
-app-adapter list                     # List all 26 apps
-app-adapter scan                     # Find installable apps
-app-adapter do "zoom.send_chat|||text=Hello"
-app-adapter prompt --style brief     # Get contribution prompt for your agent
-app-adapter server --port 8080       # Start HTTP server
-app-adapter server --mcp             # Start MCP stdio server
-```
-
-### Python
-
-```python
-from app_adapter import app_do, app_list, app_scan, get_agent_prompt
-
-print(app_list())
-app_do("terminal.run|||cmd=echo Hello from Python")
-print(get_agent_prompt("brief"))  # Inject this into your agent
-```
-
-### HTTP Server
-
-```bash
-app-adapter server --port 8080
+curl -X POST http://localhost:8080 \
+  -H "Content-Type: application/json" \
   -d '{"tool":"app_do","arguments":{"action":"zoom.send_chat|||text=Hello from AI"}}'
 ```
 
@@ -146,71 +176,44 @@ app_do("spotify.play")
 | **Finance** | TradingView |
 | **Utility** | Browser (navigate, search, screenshot) |
 
-## Make Your Agent a Contributor
-
-The killer feature: agents that **voluntarily improve** the ecosystem.
-
-```bash
-# Get the contribution prompt
-app-adapter prompt --style full
-
-# Inject it into your agent's system message.
-# Now your agent will:
-#   - Discover unregistered apps with app_scan()
-#   - Check the registry with app_search()
-#   - Register + teach + test + publish autonomously
-```
-
-Every contribution helps every AI agent worldwide. The registry grows exponentially.
-
 ## Connect to Your Agent
 
 ### Claude Desktop
 
+Add to `claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
     "app-adapter": {
-      "command": "app-adapter",
-      "args": ["server", "--mcp"]
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "/path/to/app-adapter"
     }
   }
 }
 ```
 
-### Codex
+### Any MCP-Compatible Agent
 
-```yaml
-# codex.yaml or .codex/config.json
-mcp:
-  app-adapter:
-    type: stdio
-    command: app-adapter
-    args: [server, --mcp]
+The server speaks the [Model Context Protocol](https://modelcontextprotocol.io) natively.
+Run `python server.py` for stdio mode — works with Codex, Cursor, and any MCP client.
+
+### Any Agent via HTTP
+
+```bash
+python server.py --port 8080
+# POST / with {"tool": "app_do", "arguments": {"action": "zoom.send_chat|||text=Hello"}}
 ```
 
-### Cursor
-
-```json
-// .cursor/mcp.json
-{
-  "mcpServers": {
-    "app-adapter": {
-      "command": "app-adapter",
-      "args": ["server", "--mcp"]
-    }
-  }
-}
-```
-
-### LangChain / OpenAI Agents SDK
+### Direct Python Import
 
 ```python
-from app_adapter import app_do, get_agent_prompt
-# Inject the prompt + wrap tools. See docs/INTEGRATION.md for full examples.
-```
+from app_adapter import app_do, app_list, app_scan, app_search, app_install
 
-> Full integration guide: [docs/INTEGRATION.md](docs/INTEGRATION.md)
+print(app_list())
+print(app_do("zoom.send_chat|||text=Hello World"))
+```
 
 ## Community Registry
 

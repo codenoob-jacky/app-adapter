@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "app-adapter"
+version = "0.3.0"
+description = "Control any software via unified commands — the AI-to-App bridge. Give any AI agent the power to control real apps (Zoom, Slack, WeChat, Excel, etc.) through a simple command interface."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Jacky Xu", email = "codenoob-jacky@users.noreply.github.com"}
+]
+keywords = [
+    "ai", "agent", "mcp", "automation", "adapter",
+    "browser-automation", "desktop-automation", "app-control",
+    "claude", "codex", "cursor", "llm-tools",
+    "model-context-protocol", "playwright", "uiautomation",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Environment :: Console",
+    "Framework :: AsyncIO",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pyautogui>=0.9.5",
+]
+
+[project.optional-dependencies]
+# Full browser automation (playwright)
+cdp = ["playwright>=1.40.0"]
+# Full desktop automation (Windows)
+uia = ["uiautomation>=2.0.0"]
+# Office tools
+office = ["openpyxl>=3.0.0", "python-docx>=0.8.0", "python-pptx>=0.6.0", "pdfplumber>=0.9.0", "weasyprint>=60.0", "markdown>=3.5.0"]
+# MCP server mode
+mcp = ["mcp>=1.0.0"]
+# Everything combined
+all = [
+    "playwright>=1.40.0",
+    "uiautomation>=2.0.0",
+    "openpyxl>=3.0.0", "python-docx>=0.8.0", "python-pptx>=0.6.0",
+    "pdfplumber>=0.9.0", "weasyprint>=60.0", "markdown>=3.5.0",
+    "mcp>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/codenoob-jacky/app-adapter"
+Repository = "https://github.com/codenoob-jacky/app-adapter"
+Issues = "https://github.com/codenoob-jacky/app-adapter/issues"
+Registry = "https://github.com/codenoob-jacky/app-adapter/tree/main/registry"
+
+[project.scripts]
+app-adapter = "app_adapter.__main__:main"
+
+[tool.setuptools]
+packages = ["app_adapter"]
+
+[tool.setuptools.package-data]
+app_adapter = ["adapters.json"]
