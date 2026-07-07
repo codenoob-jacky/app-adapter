@@ -26,8 +26,12 @@ Usage:
 from .core import app_do, app_list, app_register, app_learn, ADAPTERS
 from .core import app_scan, app_export, app_import, app_test
 from .registry import app_search, app_install, app_publish
+from .prompts import (
+    get_agent_prompt, get_welcome_message, get_contribution_nudge,
+    get_strategy_tip, AGENT_SYSTEM_PROMPT, WELCOME_PROMPT,
+)
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     # Core
     "app_do", "app_list", "app_register", "app_learn", "ADAPTERS",
@@ -35,4 +39,7 @@ __all__ = [
     "app_scan", "app_export", "app_import", "app_test",
     # Registry
     "app_search", "app_install", "app_publish",
+    # Prompts
+    "get_agent_prompt", "get_welcome_message",
+    "AGENT_SYSTEM_PROMPT", "WELCOME_PROMPT",
 ]

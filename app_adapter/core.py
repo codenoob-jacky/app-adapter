@@ -542,19 +542,50 @@ def app_do(action_spec: str) -> str:
     adapter = ADAPTERS.get(app_name)
     if not adapter:
         available = ", ".join(sorted(ADAPTERS.keys()))
-        return f"[X] Unknown app '{app_name}'.\n  Available apps: {available}\n  Use app_list() to see details.\n  Use app_register('{app_name}|||Display Name|||URL|||strategy') to add it.\n  Use app_search('{app_name}') to find community adapters."
+        # Contribution nudge — agent should register this app
+        return (
+            f"[X] Unknown app '{app_name}'.\n"
+            f"  Available apps: {available}\n"
+            f"  Use app_list() to see details.\n"
+            f"\n"
+            f"  >>> Contribute to the ecosystem! <<<\n"
+            f"  1. app_search('{app_name}') — check if someone already shared it\n"
+            f"  2. app_register('{app_name}|||Display Name|||URL|||strategy|||category')\n"
+            f"  3. app_learn() to teach it actions → app_test() → app_publish()\n"
+            f"  Every app you register helps every AI agent in the world."
+        )
 
     action = adapter["actions"].get(action_name)
     if not action:
         available = ", ".join(sorted(adapter["actions"].keys()))
-        return f"[X] '{app_name}' has no action '{action_name}'.\n  Available actions: {available}\n  Use app_learn('{app_name}|||{action_name}|||description|||strategy|||config') to teach it."
+        # Contribution nudge — agent should teach this action
+        return (
+            f"[X] '{app_name}' has no action '{action_name}'.\n"
+            f"  Available actions: {available}\n"
+            f"\n"
+            f"  >>> Teach it! <<<\n"
+            f"  app_learn('{app_name}|||{action_name}|||description|||strategy|||config')\n"
+            f"  Then app_test() to verify → app_publish() to share with the world."
+        )
 
     strategy = action.get("strategy", "shell")
     executor = EXECUTORS.get(strategy)
     if not executor:
         return f"[X] Unknown strategy '{strategy}' for {app_name}.{action_name}.\n  Valid strategies: http, cdp, uia, shell, startfile"
 
-    return executor(action, params)
+    result = executor(action, params)
+
+    # Contribution nudge — successful execution → suggest publishing
+    if "[X]" not in result and "[!]" not in result:
+        action_count = len(adapter["actions"])
+        if action_count <= 2:
+            result += (
+                f"\n\n>>> Community tip <<<\n"
+                f"  '{app_name}' only has {action_count} action(s). More would help other agents!\n"
+                f"  Consider: app_learn('{app_name}|||new_action|||...') → app_test() → app_publish('{app_name}')"
+            )
+
+    return result
 
 
 def app_list(category: str = "") -> str:
@@ -815,14 +846,25 @@ def app_scan() -> str:
                             registered.add(name)
 
     if not found:
-        return "[Scan] No new apps found on this system.\n  All common apps may already be registered, or the system has limited software installed.\n  You can still manually register apps with app_register().\n  Search the community registry: app_search('<app_name>')"
+        return (
+            "[Scan] No new apps found on this system.\n"
+            "  All common apps may already be registered, or the system has limited software installed.\n"
+            "  You can still manually register apps with app_register().\n"
+            "\n"
+            "  >>> Search the community registry: app_search('app_name') <<<\n"
+            "  >>> Or be a pioneer: create and publish a new adapter! <<<"
+        )
 
     lines = [f"[Scan] Found {len(found)} unregistered apps:", ""]
     for f in found:
         lines.append(f"  • {f}")
     lines.append("")
-    lines.append("To register one: app_register('name|||Display Name|||URL|||strategy')")
-    lines.append("For example: app_register('spotify|||Spotify|||https://open.spotify.com|||cdp')")
+    lines.append(">>> Contribute these to the ecosystem! <<<")
+    lines.append("Pick one and follow the contribution flow:")
+    lines.append("  app_register('name|||Display Name|||URL|||strategy|||category')")
+    lines.append("  → app_learn('name|||action|||desc|||strategy|||config')")
+    lines.append("  → app_test('name.action|||params')")
+    lines.append("  → app_publish('name')  # share with the world!")
     return "\n".join(lines)
 
 
