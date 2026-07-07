@@ -1,2 +1,0 @@
-[console_scripts]
-app-adapter = app_adapter.__main__:main
