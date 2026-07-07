@@ -1,0 +1,33 @@
+{
+  "discord": {
+    "name": "Discord",
+    "url": "https://discord.com",
+    "category": "communication",
+    "actions": {
+      "open": {
+        "desc": "Open Discord in browser",
+        "strategy": "cdp",
+        "cdp_cmd": "navigate",
+        "params": {"url": "https://discord.com/app"}
+      },
+      "send_message": {
+        "desc": "Send message in current channel",
+        "strategy": "cdp",
+        "cdp_cmd": "fill_then_click",
+        "fill_selector": "[data-slate-editor='true'], [role='textbox']",
+        "click_selector": "button[aria-label='Send']"
+      },
+      "mute_toggle": {
+        "desc": "Toggle mute/unmute",
+        "strategy": "cdp",
+        "cdp_cmd": "click",
+        "selector": "button[aria-label='Mute'], button[aria-label='Unmute']"
+      }
+    },
+    "_registry": {
+      "published_by": "community",
+      "version": "1.0.0",
+      "message": "Discord communication adapter"
+    }
+  }
+}

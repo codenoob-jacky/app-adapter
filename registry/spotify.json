@@ -1,0 +1,43 @@
+{
+  "spotify": {
+    "name": "Spotify",
+    "url": "https://open.spotify.com",
+    "category": "entertainment",
+    "actions": {
+      "open": {
+        "desc": "Open Spotify web player",
+        "strategy": "cdp",
+        "cdp_cmd": "navigate",
+        "params": {"url": "https://open.spotify.com"}
+      },
+      "search": {
+        "desc": "Search for tracks, artists, or albums",
+        "strategy": "cdp",
+        "cdp_cmd": "fill",
+        "selector": "input[data-testid='search-input'], input[placeholder*='Search']"
+      },
+      "play": {
+        "desc": "Play/pause current track",
+        "strategy": "cdp",
+        "cdp_cmd": "click",
+        "selector": "button[data-testid='play-button'], button[aria-label='Play']"
+      },
+      "next_track": {
+        "desc": "Skip to next track",
+        "strategy": "cdp",
+        "cdp_cmd": "click",
+        "selector": "button[data-testid='next-button'], button[aria-label='Next']"
+      },
+      "get_current": {
+        "desc": "Get currently playing track info",
+        "strategy": "http",
+        "url": "https://api.spotify.com/v1/me/player/currently-playing"
+      }
+    },
+    "_registry": {
+      "published_by": "community",
+      "version": "1.0.0",
+      "message": "Spotify music control adapter"
+    }
+  }
+}

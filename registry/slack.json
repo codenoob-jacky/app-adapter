@@ -1,0 +1,39 @@
+{
+  "slack": {
+    "name": "Slack",
+    "url": "https://slack.com",
+    "category": "communication",
+    "actions": {
+      "open": {
+        "desc": "Open Slack in browser",
+        "strategy": "cdp",
+        "cdp_cmd": "navigate",
+        "params": {"url": "https://slack.com"}
+      },
+      "send_message": {
+        "desc": "Send message to current channel",
+        "strategy": "cdp",
+        "cdp_cmd": "fill_then_click",
+        "fill_selector": "[data-qa='message_input'], .ql-editor",
+        "click_selector": "[data-qa='texty_send_button'], button[type='submit']"
+      },
+      "search": {
+        "desc": "Search messages and channels",
+        "strategy": "cdp",
+        "cdp_cmd": "fill",
+        "selector": "[data-qa='search_input'], input[aria-label='Search']"
+      },
+      "jump_to_channel": {
+        "desc": "Jump to a specific channel",
+        "strategy": "cdp",
+        "cdp_cmd": "click",
+        "selector": "[data-qa='channel_sidebar_name_{channel}']"
+      }
+    },
+    "_registry": {
+      "published_by": "community",
+      "version": "1.0.0",
+      "message": "Slack workspace communication adapter"
+    }
+  }
+}

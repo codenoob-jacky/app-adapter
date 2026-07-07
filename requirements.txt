@@ -1,3 +1,17 @@
+# Core (required)
 pyautogui>=0.9.5
 uiautomation>=2.0.0
+
+# MCP protocol (optional — for MCP stdio mode)
 mcp>=1.0.0
+
+# Browser automation (optional — for real CDP execution)
+playwright>=1.40.0
+
+# Office automation (optional — for Word/Excel/PPT/PDF tools)
+openpyxl>=3.0.0
+python-docx>=0.8.0
+python-pptx>=0.6.0
+pdfplumber>=0.9.0
+weasyprint>=60.0
+markdown>=3.5.0
