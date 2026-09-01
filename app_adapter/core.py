@@ -234,10 +234,33 @@ DEFAULT_ADAPTERS = {
         "name": "Web Browser",
         "category": "utility",
         "actions": {
-            "open": {"desc": "Navigate to URL", "strategy": "cdp", "cdp_cmd": "navigate"},
-            "search": {"desc": "Search the web via Google", "strategy": "http", "url": "https://www.google.com/search?q={query}"},
-            "screenshot": {"desc": "Take page screenshot", "strategy": "cdp", "cdp_cmd": "screenshot"},
-            "get_text": {"desc": "Extract page text content", "strategy": "cdp", "cdp_cmd": "evaluate", "js": "document.body.innerText"},
+            "open": {"desc": "Navigate to URL (params: url=https://...). Uses a persistent dedicated browser — logins survive between runs.", "strategy": "cdp", "cdp_cmd": "navigate"},
+            "inspect": {"desc": "Scan page DOM for interactive elements + suggested CSS selectors. ALWAYS do this before clicking blind (params: description=optional area like '登录框', max_items=20)", "strategy": "cdp", "cdp_cmd": "inspect"},
+            "click": {"desc": "Click element by CSS selector, or by visible text (params: selector=button.submit OR text=登录)", "strategy": "cdp", "cdp_cmd": "click"},
+            "click_text": {"desc": "Click element by its visible text, e.g. text=登录 (params: text=)", "strategy": "cdp", "cdp_cmd": "click_text"},
+            "fill": {"desc": "Fill an input field instantly (params: selector=, text=). Use browser.inspect to find the selector first", "strategy": "cdp", "cdp_cmd": "fill"},
+            "type": {"desc": "Type text with real keyboard events — use when fill doesn't register (React/Draft.js/ProseMirror) (params: selector=, text=, delay_ms=50)", "strategy": "cdp", "cdp_cmd": "type"},
+            "press_key": {"desc": "Press a keyboard key, e.g. Enter / Escape / ArrowDown / Control+a (params: key=)", "strategy": "cdp", "cdp_cmd": "press_key"},
+            "upload": {"desc": "Upload a local file (params: selector=input[type=file] optional, file=C:/path/to/img.png)", "strategy": "cdp", "cdp_cmd": "upload"},
+            "read": {"desc": "Read the current page's visible text (up to 8000 chars, with URL+title)", "strategy": "cdp", "cdp_cmd": "read"},
+            "check": {"desc": "Verify element state after acting — never assume an action worked (params: selector=, check=state|text|count)", "strategy": "cdp", "cdp_cmd": "check"},
+            "screenshot": {"desc": "Take page screenshot (params: path=screenshot.png optional, full=true optional)", "strategy": "cdp", "cdp_cmd": "screenshot"},
+            "evaluate": {"desc": "Run JavaScript on the page and return the result (params: js=)", "strategy": "cdp", "cdp_cmd": "evaluate"},
+            "search": {"desc": "Search the web via Google (params: query=)", "strategy": "http", "url": "https://www.google.com/search?q={query}"},
+            "get_text": {"desc": "Extract page text content (legacy — prefer browser.read)", "strategy": "cdp", "cdp_cmd": "get_text"},
+        },
+    },
+
+    # ── Windows Desktop (UI Automation) ──
+    "windows": {
+        "name": "Windows Desktop (UIA)",
+        "category": "utility",
+        "actions": {
+            "inspect_ui": {"desc": "Dump the native control tree (Name/AutomationId of buttons, inputs, menus) of the foreground or named window. ALWAYS inspect before clicking native apps (params: window_name=optional)", "strategy": "uia", "uia_action": "inspect"},
+            "click_element": {"desc": "Click a native control by its Name or AutomationId — 100% precise, no image guessing (params: name= or automation_id=, window_name=strong constraint: window not found = error, no global fallback; close/delete/quit-type controls additionally require confirm=true)", "strategy": "uia", "uia_action": "click"},
+            "type_text": {"desc": "Type text into a native input (WeChat, DingTalk, file dialogs...) (params: text=, name= or automation_id= optional target, window_name=strong constraint: typed keys go to that window, never blindly to foreground)", "strategy": "uia", "uia_action": "type_text"},
+            "open_app": {"desc": "Launch a desktop app by name (params: name=notepad / 微信 / zoom)", "strategy": "uia", "uia_action": "open_app"},
+            "find_window": {"desc": "List open windows matching a name (params: target=Zoom)", "strategy": "uia", "uia_action": "find_window"},
         },
     },
 
@@ -277,14 +300,35 @@ DEFAULT_ADAPTERS = {
 # ═══ Persistence ═══
 
 def _load_adapters() -> dict:
-    """Load adapters from disk, merging with defaults. Saved adapters override defaults."""
+    """Load adapters from disk, merging with defaults.
+
+    Merge is per-ACTION: a saved action overrides the default action with the
+    same name, but all other default actions of that app survive. (A plain
+    dict.update would let one stale saved app shadow the whole default —
+    e.g. an old saved 'browser' hiding browser.screenshot forever.)
+    """
     try:
         if os.path.exists(ADAPTERS_FILE):
             with open(ADAPTERS_FILE, "r", encoding="utf-8") as f:
                 saved = json.load(f)
+            if not isinstance(saved, dict):
+                return dict(DEFAULT_ADAPTERS)
             merged = dict(DEFAULT_ADAPTERS)
-            # Deep merge: saved app fully overrides default app
-            merged.update(saved)
+            for app_name, adapter in saved.items():
+                if not isinstance(adapter, dict):
+                    continue
+                if app_name not in merged:
+                    merged[app_name] = adapter  # user-defined app, taken as-is
+                    continue
+                base = dict(merged[app_name])
+                base_actions = dict(base.get("actions", {}))
+                for action_name, action in (adapter.get("actions") or {}).items():
+                    base_actions[action_name] = action  # saved action wins by name
+                base["actions"] = base_actions
+                for key, value in adapter.items():  # name/url/category also updatable
+                    if key != "actions":
+                        base[key] = value
+                merged[app_name] = base
             return merged
     except Exception:
         pass
@@ -347,68 +391,74 @@ def _execute_cdp(action: dict, params: dict) -> str:
     """Execute via Chrome DevTools Protocol using Playwright.
 
     If Playwright is available, performs REAL browser automation.
-    If not available, returns actionable instructions for the agent.
+    If not available, the executor returns actionable instructions.
     """
     cmd = action.get("cdp_cmd", "click")
-    selector = action.get("selector", "")
-    text = params.get("text", params.get("content", ""))
-    url = params.get("url") or action.get("params", {}).get("url", "")
-
-    # Try real Playwright execution
     try:
         from .cdp_executor import get_cdp_executor
-        cdp = get_cdp_executor()
-        if cdp and cdp.available:
-            return cdp.execute(cmd, action, params)
-    except Exception:
-        pass  # Fall through to instruction mode
-
-    # Instruction mode — tell the agent what to do
-    if cmd == "navigate":
-        return f"[CDP] Navigate to {url or '(no URL provided)'}\n  Action: Open browser and go to the URL above."
-    elif cmd == "click":
-        return f"[CDP] Click element matching '{selector}'\n  Action: Find and click this element in the browser."
-    elif cmd == "fill":
-        return f"[CDP] Type '{text}' into '{selector}'\n  Action: Locate the input field and type the text."
-    elif cmd == "fill_then_click":
-        fill_sel = action.get("fill_selector", selector)
-        click_sel = action.get("click_selector", "")
-        return f"[CDP] Fill '{fill_sel}' then click '{click_sel}'\n  Action: Type content into the first field, then press submit."
-    elif cmd == "click_then_upload":
-        return f"[CDP] Click '{selector}' then upload file\n  Action: Click the element to open file dialog, then select the file."
-    elif cmd == "screenshot":
-        return f"[CDP] Take screenshot of current page.\n  Action: Capture the visible area of the browser."
-    elif cmd == "evaluate":
-        js = action.get("js", "")
-        return f"[CDP] Run JavaScript: {js[:200]}\n  Action: Execute JS in the browser console."
-    return f"[CDP] {cmd}: {action.get('desc', '')}\n  Tip: Install Playwright for real browser automation: pip install playwright && python -m playwright install"
+        return get_cdp_executor().execute(cmd, action, params)
+    except Exception as e:
+        return f"[X] CDP executor failed: {e}\n  Tip: pip install playwright (no browser download needed — we connect over CDP)."
 
 
 def _execute_uia(action: dict, params: dict) -> str:
     """Execute via Windows UI Automation / simulated input.
 
-    Tries real UIAutomation first, falls back to PowerShell SendKeys.
+    Tries real UIAutomation first, falls back to PowerShell SendKeys for typing.
     """
     uia_action = action.get("uia_action", "click")
-    target = action.get("target", "")
+    target = params.get("target") or action.get("target", "")
+    # Param-level overrides so agents can address any control without app_learn
+    name = str(params.get("name") or target or "")
+    automation_id = str(params.get("automation_id", "") or "")
+    window_name = str(params.get("window_name", "") or "")
+    text = str(params.get("text", "") or "")
+    # confirm: JSON 模式传的是 bool,k=v 模式传的是字符串 — 都要认
+    confirm = params.get("confirm") in (True, 1, "true", "True", "1", "yes", "Yes")
 
-    if uia_action == "type_text":
-        text = params.get("text", "")
-        if not text:
-            return "[X] type_text requires 'text' parameter.\n  Usage: app_do('app.action|||text=Your message here')"
+    try:
+        from .uia_executor import get_uia_executor
+        uia = get_uia_executor()
+    except Exception:
+        uia = None
 
-        # Method 1: Real UIAutomation (find element + send keys)
+    if uia and uia.available:
         try:
-            from .uia_executor import get_uia_executor
-            uia = get_uia_executor()
-            if uia and uia.available:
-                result = uia.type_text(target, text)
+            if uia_action == "inspect":
+                return uia.inspect_ui(window_name)
+            if uia_action == "click":
+                result = uia.click_element(name, automation_id, window_name, confirm=confirm)
                 if result:
                     return result
-        except Exception:
-            pass
+            elif uia_action == "type_text":
+                if not text:
+                    return "[X] type_text requires a 'text' parameter.\n  Usage: app_do('windows.type_text|||text=Hello') or app_do('windows.type_text|||{\"text\": \"Hello\", \"name\": \"搜索框\"}')"
+                result = uia.type_text(name, automation_id, text, window_name)
+                if result:
+                    return result
+                # Fall through to PowerShell SendKeys below
+            elif uia_action == "open_app":
+                app_name = str(params.get("name") or params.get("app") or target or "").strip()
+                if not app_name:
+                    return "[X] open_app requires a 'name' parameter.\n  Usage: app_do('windows.open_app|||name=notepad')"
+                return uia.open_app(app_name)
+            elif uia_action == "find_window":
+                return uia.find_window(target)
+        except Exception as e:
+            return f"[X] UIA {uia_action} failed: {e}"
 
-        # Method 2: PowerShell SendKeys (works with Zoom and many apps)
+    # Fallbacks when UIA is unavailable or didn't handle the request
+    if uia_action == "type_text":
+        if not text:
+            return "[X] type_text requires a 'text' parameter.\n  Usage: app_do('app.action|||text=Your message here')"
+        if window_name:
+            # SendKeys 只能打前台窗口,无法保证打到 window_name 指的窗口 —
+            # 宁可拒绝,不能把文本打进任意前台应用(同 2026-09-01 事故类别)
+            return (f"[X] UIA 不可用而 window_name='{window_name}' 被指定 — "
+                    "SendKeys 兜底只会打进当前前台窗口,拒绝冒险。"
+                    "请安装 uiautomation(pip install uiautomation),"
+                    "或先手动把目标窗口置于前台后去掉 window_name 重试。")
+        # PowerShell SendKeys (works with Zoom and many apps)
         try:
             escaped = text.replace('"', '""').replace('+', '{+}').replace('^', '{^}').replace('%', '{%}').replace('~', '{~}')
             ps = f'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("{escaped}")'
@@ -417,31 +467,14 @@ def _execute_uia(action: dict, params: dict) -> str:
                 return f"[UIA] Typed '{text[:100]}' into target.\n  Verify in the app window — text may need manual Enter to send."
             return f"[X] SendKeys failed: {r.stderr[:200]}"
         except FileNotFoundError:
-            return f"[X] PowerShell not available. On Linux/Mac, install uiautomation: pip install uiautomation"
+            return "[X] PowerShell not available. On Linux/Mac, install uiautomation: pip install uiautomation"
         except Exception as e:
             return f"[X] type_text failed: {e}"
 
-    elif uia_action == "click":
-        # Try to find and click an element
-        try:
-            from .uia_executor import get_uia_executor
-            uia = get_uia_executor()
-            if uia and uia.available:
-                result = uia.click_element(target)
-                if result:
-                    return result
-        except Exception:
-            pass
+    if uia_action == "click":
         return f"[UIA] Click '{target}'.\n  Tip: On Windows, install uiautomation for real desktop automation: pip install uiautomation"
 
-    elif uia_action == "find_window":
-        try:
-            from .uia_executor import get_uia_executor
-            uia = get_uia_executor()
-            if uia and uia.available:
-                return uia.find_window(target)
-        except Exception:
-            pass
+    if uia_action == "find_window":
         return f"[UIA] Find window matching '{target}'.\n  Use the window title or partial name to locate it."
 
     return f"[UIA] {uia_action} on '{target}'.\n  Use UIAutomation or system-level automation to interact with this element."
@@ -533,11 +566,23 @@ def app_do(action_spec: str) -> str:
 
     params = {}
     if params_str:
-        for kv in params_str.split(","):
-            kv = kv.strip()
-            if "=" in kv:
-                k, v = kv.split("=", 1)
-                params[k.strip()] = v.strip()
+        stripped = params_str.strip()
+        if stripped.startswith("{"):
+            # JSON mode — values may contain commas/quotes/URLs safely
+            try:
+                data = json.loads(stripped)
+            except json.JSONDecodeError as e:
+                return f"[X] Invalid JSON params: {e}\n  Provide a JSON object like: {{\"url\": \"https://example.com\", \"text\": \"hello, world\"}}\n  Or legacy k=v,k=v pairs (values must not contain commas)."
+            if not isinstance(data, dict):
+                return "[X] JSON params must be an object: {\"key\": \"value\", ...}"
+            params = {str(k): v for k, v in data.items()}
+        else:
+            # Legacy k=v,k=v mode — values must not contain commas
+            for kv in params_str.split(","):
+                kv = kv.strip()
+                if "=" in kv:
+                    k, v = kv.split("=", 1)
+                    params[k.strip()] = v.strip()
 
     adapter = ADAPTERS.get(app_name)
     if not adapter:
@@ -718,9 +763,10 @@ def app_learn(spec: str) -> str:
     if strategy not in EXECUTORS:
         return f"[X] Unknown strategy '{strategy}'.\n  Valid strategies: {', '.join(EXECUTORS.keys())}"
 
+    overwrote = ""
     if action_name in ADAPTERS[app_name]["actions"]:
         existing = ADAPTERS[app_name]["actions"][action_name]
-        return f"[!] '{app_name}.{action_name}' already exists: {existing['desc']} [{existing['strategy']}]\n  To update it, the action will be overwritten."
+        overwrote = f"\n  Overwrote existing action (was: {existing['desc']} [{existing.get('strategy', '?')}])"
 
     action = {"desc": desc, "strategy": strategy}
 
@@ -772,7 +818,7 @@ def app_learn(spec: str) -> str:
         "startfile": "Provide full path to .exe or app name",
     }
 
-    return f"[OK] Learned {app_name}.{action_name}\n  Description: {desc}\n  Strategy: {strategy} — {strategy_hints.get(strategy, '')}\n  Persisted to {ADAPTERS_FILE}\n  Test it: app_do('{app_name}.{action_name}')"
+    return f"[OK] Learned {app_name}.{action_name}\n  Description: {desc}\n  Strategy: {strategy} — {strategy_hints.get(strategy, '')}\n  Persisted to {ADAPTERS_FILE}{overwrote}\n  Test it: app_do('{app_name}.{action_name}')"
 
 
 # ═══════════════════════════════════════════════════════════════
